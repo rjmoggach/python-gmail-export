@@ -1,11 +1,28 @@
 [tool.poetry]
 name = "gmail-export"
 version = "0.1.0"
-description = ""
+description = "my gmail export tools"
 authors = ["Robert Moggach <rob@moggach.com>"]
 
 [tool.poetry.dependencies]
+beautifulsoup4 = "^4.9.3"
+click = "^7.1.2"
+colorama = "^0.4.4"
+google-api-python-client = "^2.1.0"
+google-auth-httplib2 = "^0.1.0"
+google-auth-oauthlib = "^0.4.4"
+html5lib = "^1.1"
+lxml = "^4.6.3"
+pdfminer3k = "^1.3.4"
+pendulum = "^2.1.2"
+pyconfigstore3 = "^1.0.1"
+PyInquirer = "^1.0.3"
+PyPDF2 = "^1.26.0"
 python = "^3.7"
+python-magic = "^0.4.22"
+python-magic-bin = "^0.4.14"
+reportlab = "^3.5.66"
+termcolor = "^1.1.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
