@@ -217,11 +217,20 @@ class GmailMessage(object):
         # get entire message in RFC2822 formatted base64url encoded string to convert to .eml
         msg_raw = self.service.users().messages().get(userId="me", id=self.id, format="raw", metadataHeaders=None).execute()
         msg_bytes = base64.urlsafe_b64decode(msg_raw['raw'])
-        # msg_str = base64.urlsafe_b64decode(msg_raw['raw'].encode('UTF-8'))
         mime_msg = email.message_from_bytes(msg_bytes)
+        # msg_str = base64.urlsafe_b64decode(msg_raw['raw'].encode('UTF-8'))
         # mime_msg = email.message_from_string(msg_str.decode())
         self.msg = mime_msg
         return mime_msg
+
+    def get_message_body(self):
+        part = self.get_part_by_content_type("text/html")
+        if not part is None:
+            return self.handle_html_message_body(part)
+        part = self.get_part_by_content_type("text/plain")
+        if not part is None:
+            return self.handle_plain_message_body(part)
+        raise FatalException("Email message has no body")
 
     def get_name_parts(self):
         # get message metadata (specifically Subject)
@@ -237,18 +246,25 @@ class GmailMessage(object):
 
     def convert(self):
         body = self.get_message_body()
-        # body = self.remove_invalid_urls(body)
+        body = self.clean_soup(body)
         headers = self.get_headers()
+
+        # self.msg_dt, self.subject = self.get_name_parts()
+        self.attachments = self.find_attachments()
+        attachment_meta = [att[0] for att in self.attachments]
+        for m in attachment_meta:
+            m.update((k, f'{self.msg_dt}-EmlAtt-{m["filename"]}') for k, v in m.items() if k == "filename")
+       
+
         template = env.get_template('email.html')
-        rendered = template.render(headers=headers, body=body)
+        rendered = template.render(headers=headers, body=body, attachments=attachment_meta)
         return rendered
 
-    def remove_invalid_urls(self, payload):
+    def clean_soup(self, payload):
         soup = BeautifulSoup(payload, "html5lib")
         soup.html.hidden = True
         soup.body.hidden = True
         soup.head.hidden = True
-        # print(soup.prettify())
         images = soup.findAll('img')
         for img in images:
             if img.has_attr('src'):
@@ -275,7 +291,13 @@ class GmailMessage(object):
             if font.has_attr('face'):
                 face = font['face']
                 if face == "tahoma, sans-serif":
-                    font['face']='"Helvetica Neue","Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji",Helvetica,Arial,sans-serif',
+                    font['face']='"Helvetica Neue", "Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", Helvetica,  Arial, sans-serif',
+            if font.has_attr('color'):
+                color = font['color']
+                if color =="#000000": del font['color']
+            if font.has_attr('style'):
+                style = font['style']
+                if style == "background-color:rgb(255,255,255)": del font['style']
         # return str(soup.encode('utf-8').decode('utf-8'))
         return str(soup.prettify('utf-8').decode('utf-8'))
 
@@ -372,15 +394,6 @@ class GmailMessage(object):
             payload = f"<pre>{payload}</pre>"
         return payload
 
-    def get_message_body(self):
-        part = self.get_part_by_content_type("text/html")
-        if not part is None:
-            return self.handle_html_message_body(part)
-        part = self.get_part_by_content_type("text/plain")
-        if not part is None:
-            return self.handle_plain_message_body(part)
-        raise FatalException("Email message has no body")
-
     def replace_cid(self, matchobj):
         cid = matchobj.group(1)
         image_part = self.get_part_by_content_id(cid)
@@ -402,8 +415,9 @@ class GmailMessage(object):
 
     def export(self, eml=True, html5=False, pdf=False, att=False, inl=False):
         thread_path = self.thread.get_export_path(self.thread.export_root)
-        os.makedirs(thread_path, exist_ok=True)
-        print("> THREAD PATH: ", thread_path)
+        if not os.path.isdir(thread_path):
+            os.makedirs(thread_path, exist_ok=True)
+        print("> Saving to thread: ", thread_path)
         self.msg_dt, self.subject = self.get_name_parts()
         self.msg = self.get_message()
         if eml:
@@ -428,17 +442,17 @@ class GmailMessage(object):
             with open(write_path, 'w') as outfile:
                 gen = email.generator.Generator(outfile)
                 gen.flatten(self.msg)
-            print(f"  > SAVED EML ID: {self.id} NAME: {eml_name}")
+            print(f"  > Saved msg id: {self.id} to eml: {eml_name}.")
             return write_path
         except:
             return None
 
     def export_html(self, export_path, html_name):
-        output = self.convert()
+        output = self.convert().encode('utf-8')
         write_path = os.path.join(export_path, html_name)
         with open(write_path, 'wb') as outfile:
-            outfile.write(output.encode('utf-8'))
-        print(f"  > SAVED HTML ID: {self.id} NAME: {html_name}")
+            outfile.write(output)
+            print(f"  > Saved msg id: {self.id} to html: {html_name}.")
         return write_path
 
     def export_pdf(self, export_path, pdf_name):
@@ -454,7 +468,7 @@ class GmailMessage(object):
         ret_code = wkh2p_process.returncode
         assert output == b''
         self.process_errors(ret_code, error)
-        print(f"  > SAVED PDF ID: {self.id} NAME: {pdf_name}")
+        print(f"  > Saved msg id: {self.id} to pdf: {pdf_name}")
         return write_path
 
     def process_errors(self, ret_code, error):
@@ -487,7 +501,8 @@ class GmailMessage(object):
             with open(write_path, 'wb') as outfile:
                 data = part.get_payload(decode=True)
                 outfile.write(data)
-            print(f"    > SAVED CONTENT: {content_name}")
+            str_inline="inline " if inline else ""
+            print(f"    > Saved {str_inline}content: {content_name}.")
         return True
 
     def find_attachments(self, inline=False):

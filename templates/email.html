@@ -15,7 +15,7 @@
             }
         }
         body {
-            font-family: "Helvetica Neue",Helvetica,Arial,"Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji",sans-serif;
+            font-family: "Helvetica Neue", Helvetica, Arial, "Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", sans-serif;
             padding: 20px 40px 20px 60px;
             min-width:600px;
             -webkit-print-color-adjust: exact;
@@ -27,7 +27,7 @@
             border-bottom:1px solid #ccc;
         }
         dl.email-meta {
-            font-family:"Helvetica Neue",Helvetica,Arial,"Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji",sans-serif;
+            font-family: "Helvetica Neue", Helvetica, Arial, "Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", sans-serif;
             font-size:14px;
             padding:0;
             margin:0;
@@ -71,12 +71,32 @@
         dl.email-meta dd.strong {
             font-weight:bold
         }
-        div.email-attachments {
+        div#attachments {
             font-size:0.85em;
-            color:#999
+            color:#999;
+            border-top: 1px solid #ccc;
+            margin: 10px 0;
+            padding: 10px 0px 0px;
         }
-        ul {
+        div#attachments h3 {
+            font-family: "Helvetica Neue", Helvetica, Arial, "Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", sans-serif;
+            color: black;
+        }
+        div#attachments ul {
             list-style-type: none;
+            padding: 0;
+        }
+        div#attachments ul li {
+            float: left;
+            padding: 10px 20px;
+            min-width: 120px;
+            background-color: #eee;
+            border: 2px solid #999;
+            border-radius: 3px;
+            margin: 10px;
+        }
+        div#attachments ul li:first-child {
+            margin-left: 0;
         }
     </style>
     </head>
@@ -91,8 +111,10 @@
     </dl>
     </div>
     {{ body }}{% if attachments %}
+    <div id="attachments"><h3>Attachments</h3>
     <ul>{% for attachment in attachments %}
-        <li>{{ attachment.name }}</li>{% endfor %}
-    </ul>{% endif %}
+        <li>{{ attachment['filename'] }}</li>{% endfor %}
+    </ul>
+    </div>{% endif %}
 </body>
 </html>
