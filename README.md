@@ -3,6 +3,9 @@
 My python tools to export mail from gmail in a format I require.
 This library allows me to connect to my Gmail account and download as `.eml` files for a specific label. I then convert the `.eml` files to pdf.
 
+> Use at your own risk. Don't delete files if you're not clear on what's happening in here.
+
+
 ## Usage
 
 ### Installation & Environment
@@ -61,10 +64,13 @@ The following were instrumental in me getting to my implementation:
 * [https://github.com/pixelcog/gmail-to-pdf](https://github.com/pixelcog/gmail-to-pdf)
 * [https://github.com/andrewferrier/email2pdf](https://github.com/andrewferrier/email2pdf)
 * [https://github.com/hghotra/eml2pdflib](https://github.com/hghotra/eml2pdflib)
+* [https://www.thepythoncode.com/article/use-gmail-api-in-python](https://www.thepythoncode.com/article/use-gmail-api-in-python)
 
 
 
 ## More Resources
+
+* https://developers.google.com/gmail/api/reference/rest/v1/users.messages/get
 
 ### *List* email by Labels
 * https://developers.google.com/resources/api-libraries/documentation/gmail/v1/python/latest/index.html 
