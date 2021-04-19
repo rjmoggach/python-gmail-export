@@ -29,7 +29,7 @@ from PyInquirer import Token, ValidationError, Validator, print_json, prompt, st
 from pprint import pprint
 from subprocess import Popen, PIPE
 from jinja2 import Environment, PackageLoader, select_autoescape
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString, Tag
 from email.header import Header, decode_header, make_header
 from xhtml2pdf import pisa
 
@@ -59,7 +59,8 @@ WKHTMLTOPDF_ERRORS_IGNORE = frozenset(
      r'Invalid SOS parameters for sequential JPEG',
      r'libpng warning: Out of place sRGB chunk',
      r'Exit with code 1 due to network error: ContentNotFoundError',
-     r'Exit with code 1 due to network error: UnknownContentError'])
+     r'Exit with code 1 due to network error: UnknownContentError',
+     r'QPainter::begin(): Returned false\r\nExit with code 1'])
 
 env = Environment(
     loader=PackageLoader('gmail_export','templates'),
@@ -215,8 +216,10 @@ class GmailMessage(object):
     def get_message(self):
         # get entire message in RFC2822 formatted base64url encoded string to convert to .eml
         msg_raw = self.service.users().messages().get(userId="me", id=self.id, format="raw", metadataHeaders=None).execute()
-        msg_str = base64.urlsafe_b64decode(msg_raw['raw'].encode('UTF-8'))
-        mime_msg = email.message_from_string(msg_str.decode())
+        msg_bytes = base64.urlsafe_b64decode(msg_raw['raw'])
+        # msg_str = base64.urlsafe_b64decode(msg_raw['raw'].encode('UTF-8'))
+        mime_msg = email.message_from_bytes(msg_bytes)
+        # mime_msg = email.message_from_string(msg_str.decode())
         self.msg = mime_msg
         return mime_msg
 
@@ -234,11 +237,47 @@ class GmailMessage(object):
 
     def convert(self):
         body = self.get_message_body()
-        body = self.remove_invalid_urls(body)
+        # body = self.remove_invalid_urls(body)
         headers = self.get_headers()
         template = env.get_template('email.html')
         rendered = template.render(headers=headers, body=body)
         return rendered
+
+    def remove_invalid_urls(self, payload):
+        soup = BeautifulSoup(payload, "html5lib")
+        soup.html.hidden = True
+        soup.body.hidden = True
+        soup.head.hidden = True
+        # print(soup.prettify())
+        images = soup.findAll('img')
+        for img in images:
+            if img.has_attr('src'):
+                src = img['src']
+                lower_src = src.lower()
+                if lower_src == 'broken':
+                    del img['src']
+                elif not lower_src.startswith('data'):
+                    found_blacklist = False
+                    for image_load_blacklist_item in IMAGE_LOAD_BLACKLIST:
+                        if image_load_blacklist_item in lower_src:
+                            found_blacklist = True
+                    if not found_blacklist:
+                        if not can_url_fetch(src):
+                            del img['src']
+                    else:
+                        del img['src']
+        for br in soup.findAll("br"):
+            while isinstance(br.next_sibling, Tag) and br.next_sibling.name == 'br':
+                br.next_sibling.extract()
+        for meta in soup.findAll("meta"):
+            meta.extract()
+        for font in soup.findAll('font'):
+            if font.has_attr('face'):
+                face = font['face']
+                if face == "tahoma, sans-serif":
+                    font['face']='"Helvetica Neue","Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji",Helvetica,Arial,sans-serif',
+        # return str(soup.encode('utf-8').decode('utf-8'))
+        return str(soup.prettify('utf-8').decode('utf-8'))
 
     def get_headers(self):
         payload_headers=self.meta['payload']['headers']
@@ -304,9 +343,18 @@ class GmailMessage(object):
         payload = part.get_payload(decode=True)
         charset = part.get_content_charset()
         if not charset: charset = 'utf-8'
-        payload = re.sub(r'cid:([\w_@.-]+)',
-                         functools.partial(self.replace_cid),
-                         str(payload, charset))
+        try:
+            payload = re.sub(r'cid:([\w_@.-]+)', functools.partial(self.replace_cid), str(payload, charset))
+        except UnicodeDecodeError:
+            charset = 'latin1'
+            try:
+                payload = re.sub(r'cid:([\w_@.-]+)', functools.partial(self.replace_cid), str(payload, charset))
+            except UnicodeDecodeError:
+                pass
+                try:
+                    payload = re.sub(r'cid:([\w_@.-]+)', functools.partial(self.replace_cid), str(payload, charset))
+                except:
+                    pass
         return payload
 
     def handle_plain_message_body(self, part):
@@ -321,8 +369,7 @@ class GmailMessage(object):
                 charset = 'utf-8'
             payload = str(payload, charset)
             payload = html.escape(payload)
-            payload = "<html><body><pre>\n" + \
-                payload + "\n</pre></body></html>"
+            payload = f"<pre>{payload}</pre>"
         return payload
 
     def get_message_body(self):
@@ -331,7 +378,7 @@ class GmailMessage(object):
             return self.handle_html_message_body(part)
         part = self.get_part_by_content_type("text/plain")
         if not part is None:
-            return self.handle_html_message_body(part)
+            return self.handle_plain_message_body(part)
         raise FatalException("Email message has no body")
 
     def replace_cid(self, matchobj):
@@ -352,35 +399,6 @@ class GmailMessage(object):
         #     raise FatalException(
         #         "Could not find image cid " + cid + " in email content.")
         return ""
-
-    def remove_invalid_urls(self, payload):
-        soup = BeautifulSoup(payload, "html5lib")
-        soup = soup.body.next
-        for img in soup.find_all('img'):
-            if img.has_attr('src'):
-                src = img['src']
-                lower_src = src.lower()
-                if lower_src == 'broken':
-                    del img['src']
-                elif not lower_src.startswith('data'):
-                    found_blacklist = False
-
-                    for image_load_blacklist_item in IMAGE_LOAD_BLACKLIST:
-                        if image_load_blacklist_item in lower_src:
-                            found_blacklist = True
-
-                    if not found_blacklist:
-                        if not can_url_fetch(src):
-                            del img['src']
-                    else:
-                        del img['src']
-        for font in soup.find_all('font'):
-            if font.has_attr('face'):
-                face = font['face']
-                if face == "tahoma, sans-serif":
-                    font['face']='"Helvetica Neue","Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji",Helvetica,Arial,sans-serif',
-        return str(soup)
-    
 
     def export(self, eml=True, html5=False, pdf=False, att=False, inl=False):
         thread_path = self.thread.get_export_path(self.thread.export_root)
@@ -422,13 +440,6 @@ class GmailMessage(object):
             outfile.write(output.encode('utf-8'))
         print(f"  > SAVED HTML ID: {self.id} NAME: {html_name}")
         return write_path
-
-    def export_pdf2(self, export_path, pdf_name):
-        output = self.convert()
-        write_path = os.path.join(export_path, pdf_name)
-        with open(write_path, 'w+b') as outfile:
-            pisa_status = pisa.CreatePDF( output, dest=outfile)
-        print(f"  > SAVED PDF: {pdf_name}")
 
     def export_pdf(self, export_path, pdf_name):
         output = self.convert().encode('utf-8')
