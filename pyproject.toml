@@ -23,6 +23,10 @@ python-magic = "^0.4.22"
 python-magic-bin = "^0.4.14"
 reportlab = "^3.5.66"
 termcolor = "^1.1.0"
+fpdf2 = "^2.3.2"
+Werkzeug = "^1.0.1"
+Jinja2 = "^2.11.3"
+xhtml2pdf = "^0.2.5"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
