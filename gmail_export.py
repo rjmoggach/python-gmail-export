@@ -9,7 +9,6 @@ __version__ = '0.1.0'
 import os
 import re
 import sys
-import mimetypes
 import argparse
 import functools
 from pathlib import Path
@@ -26,12 +25,10 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from PyInquirer import Token, ValidationError, Validator, print_json, prompt, style_from_dict
-from pprint import pprint
 from subprocess import Popen, PIPE
 from jinja2 import Environment, PackageLoader, select_autoescape
 from bs4 import BeautifulSoup, NavigableString, Tag
 from email.header import Header, decode_header, make_header
-from xhtml2pdf import pisa
 
 
 DEBUG = True
