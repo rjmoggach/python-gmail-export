@@ -1,7 +1,8 @@
-# gmail-export
+# Python GMail Export CLI
 
-My python tools to export mail from gmail in a format I require.
-This library allows me to connect to my Gmail account and download as `.eml` files for a specific label. I then convert the `.eml` files to pdf.
+This is my python tool to export mail from gmail in formats I require.
+
+This library allows me to connect to my Gmail account and download as `.eml` files for a specific label. It then converts the `.eml` files to pdf or html and extracts attachments.
 
 > Use at your own risk. Don't delete files if you're not clear on what's happening in here.
 
@@ -72,17 +73,17 @@ The following were instrumental in me getting to my implementation:
 
 * https://developers.google.com/gmail/api/reference/rest/v1/users.messages/get
 
-### *List* email by Labels
+### List email by Labels
 * https://developers.google.com/resources/api-libraries/documentation/gmail/v1/python/latest/index.html 
 * https://developers.google.com/resources/api-libraries/documentation/gmail/v1/python/latest/gmail_v1.users.messages.html#list
 * example of code for list: https://developers.google.com/gmail/api/v1/reference/users/messages/list?apix_params=%7B%22userId%22%3A%22me%22%2C%22includeSpamTrash%22%3Afalse%2C%22labelIds%22%3A%5B%22LM%22%5D%7D
 
-### *Get* emails
+### Get emails
 
 * https://developers.google.com/resources/api-libraries/documentation/gmail/v1/python/latest/gmail_v1.users.messages.html#get
 * https://developers.google.com/gmail/api/v1/reference/users/messages/get 
 * https://python-forum.io/Thread-TypeError-initial-value-must-be-str-or-None-not-bytes--12161
 
-### *Thread*
+### Thread
 
 * https://developers.google.com/resources/api-libraries/documentation/gmail/v1/python/latest/gmail_v1.users.threads.html#get
