@@ -327,6 +327,7 @@ class GmailMessage(object):
             print(f"    > Saved {str_inline}content: {content_name}.")
         return True
 
+
     def find_attachments(self, inline=False):
         """
         Return a tuple of parsed content-disposition dict, message object for each attachment found
@@ -335,7 +336,16 @@ class GmailMessage(object):
         for part in self.msg.walk():
             if 'content-disposition' not in part: continue
             cd_part="".join(part['content-disposition'].splitlines())
-            content_disposition = parse_headers(cd_part)
+            cd_part=cd_part.replace('\t','')
+            cd_part_list = re.split(''';(?=(?:[^'"]|'[^']*'|"[^"]*")*$)''', cd_part)
+            ####################################################################################################################################
+            prefixes = ['attach','inline','filenam']
+            cd_part_list = [i.strip() for i in cd_part_list]
+            cd_part = ";".join(cd_part_list)
+            try:
+                content_disposition = parse_headers(cd_part)
+            except ValueError:
+                content_disposition = parse_headers(cd_part, relaxed=True)
             disposition = content_disposition.disposition
             if not disposition in ['attachment', 'inline']:
                 continue
