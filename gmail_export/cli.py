@@ -127,8 +127,9 @@ class ExportCLI(object):
 
     def export(self):
         for label in self.selected_labels:
-            # get the label path
-            label_export_path = label.get_export_path(self.export_path)
+            # labels don't have export path by default because we get that interactively
+            # init the label path with the value of self.export_path retrieved from the CLI
+            label.set_export_path(self.export_path)
             # get the label messages
             messages = label.get_messages()
             eml = True if 'eml' in self.answers['formats'] else False

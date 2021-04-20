@@ -43,7 +43,7 @@ class GmailLabel(object):
         print(msg)
         return self.messages
 
-    def get_export_path(self, export_root):
+    def set_export_path(self, export_root):
         self.export_path = os.path.join(export_root, self.name)
         return self.export_path
 
