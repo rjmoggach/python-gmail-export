@@ -15,8 +15,6 @@ try:
     DROPBOX = True
 except ImportError: DROPBOX = False
 
-__version__ = '0.1.0'
-
 TIMEZONE='America/Toronto'
 
 CFG_PATH = os.path.join(str(Path.home()), '.gmail_export')
