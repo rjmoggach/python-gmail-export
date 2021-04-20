@@ -22,7 +22,7 @@ STYLE = style_from_dict({
 
 class ExportCLI(object):
     def __init__(self, export_path=EXPORT_PATH):
-        self.gmail = GmailAPI()
+        self.api = GmailAPI()
         self.labels = []
         self.selected_labels = []
         self.threads = []
@@ -51,7 +51,7 @@ class ExportCLI(object):
 
     def get_labels(self):
         labels = []
-        results = self.gmail.get_labels()
+        results = self.api.get_labels()
         results_labels = results['labels']
         user_labels = sorted([label for label in results_labels if label['type']=="user"], key=lambda k: k['name'].lower())
         for label in user_labels:
@@ -131,12 +131,15 @@ class ExportCLI(object):
             label_export_path = label.get_export_path(self.export_path)
             # get the label messages
             messages = label.get_messages()
-            print("RESULTS: ", len(messages), " Messages.")
             eml = True if 'eml' in self.answers['formats'] else False
             html5 = True if 'html' in self.answers['formats'] else False
             pdf = True if 'pdf' in self.answers['formats'] else False
             inl = True if 'inline' in self.answers['formats'] else False
             att = True if 'attachments' in self.answers['formats'] else False
+            message_count = len(messages)
+            i=1
             for message in messages:
+                print(f"\n> Message {i} of {message_count} for label '{label.name}'.")
+                i+=1
                 message.export(eml,html5,pdf,att,inl)
 

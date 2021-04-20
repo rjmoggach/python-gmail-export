@@ -13,7 +13,7 @@ from jinja2 import Environment, PackageLoader, select_autoescape
 from bs4 import BeautifulSoup, NavigableString, Tag
 from rfc6266_parser import parse_headers, build_header
 
-from . import EXPORT_PATH, WKHTMLTOPDF_EXTERNAL_COMMAND, WKHTMLTOPDF_ERRORS_IGNORE, IMAGE_LOAD_BLACKLIST
+from . import EXPORT_PATH, WKHTMLTOPDF_EXTERNAL_COMMAND, WKHTMLTOPDF_ERRORS_IGNORE, IMAGE_LOAD_BLACKLIST, FatalException
 from .api import GmailAPI
 from .utils import get_datetime, clean, html_escape, can_url_fetch
 
@@ -63,7 +63,10 @@ class GmailMessage(object):
         return msg_dt, subject
 
     def convert(self):
-        body = self.get_message_body()
+        try:
+            body = self.get_message_body()
+        except:
+            body = ""
         body = self.clean_soup(body)
         headers = self.get_headers()
 
@@ -338,7 +341,6 @@ class GmailMessage(object):
             cd_part="".join(part['content-disposition'].splitlines())
             cd_part=cd_part.replace('\t','')
             cd_part_list = re.split(''';(?=(?:[^'"]|'[^']*'|"[^"]*")*$)''', cd_part)
-            ####################################################################################################################################
             prefixes = ['attach','inline','filenam']
             cd_part_list = [i.strip() for i in cd_part_list]
             cd_part = ";".join(cd_part_list)
@@ -349,12 +351,15 @@ class GmailMessage(object):
             disposition = content_disposition.disposition
             if not disposition in ['attachment', 'inline']:
                 continue
-            parsed = build_header(content_disposition.filename_unsafe)
             if not inline:
                 if disposition == 'attachment':
+                    try: parsed = build_header(content_disposition.filename_unsafe)
+                    except TypeError: continue
                     attachments.append((parsed, part))
             elif inline:
                 if disposition == 'inline':
+                    try: parsed = build_header(content_disposition.filename_unsafe)
+                    except TypeError: continue
                     attachments.append((parsed, part))
         return attachments
 

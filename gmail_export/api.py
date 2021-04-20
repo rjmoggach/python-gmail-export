@@ -6,7 +6,17 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 
-from . import TOKEN_PATH, CREDENTIALS_PATH, SCOPES
+from . import TOKEN_PATH, CREDENTIALS_PATH, SCOPES, AIRTABLE, AT_CONFIG
+
+import airtable
+
+class AirtableAPI(object):
+    def __init__(self):
+        self.threads = airtable.Airtable(AT_CONFIG['base_id'], 'Threads', api_key=AT_CONFIG['api_key'])
+        self.labels = airtable.Airtable(AT_CONFIG['base_id'], 'Labels', api_key=AT_CONFIG['api_key'])
+        self.messages = airtable.Airtable(AT_CONFIG['base_id'], 'Messages', api_key=AT_CONFIG['api_key'])
+        self.emails = airtable.Airtable(AT_CONFIG['base_id'], 'Emails', api_key=AT_CONFIG['api_key'])
+
 
 
 class GmailAPI(object):
@@ -17,6 +27,7 @@ class GmailAPI(object):
         self.scopes = scopes
         self.credentials = self.get_credentials()
         self.service = self.get_service()
+
 
     def get_credentials(self):
         if os.path.exists(self.token_path):
@@ -46,3 +57,6 @@ class GmailAPI(object):
     
     def get_message_meta(self, id):
         return self.service.users().messages().get(userId="me", id=id, format="metadata", metadataHeaders=["Subject","From","To","Date","Cc","Bcc"]).execute()
+    
+    def get_thread(self, id):
+        return self.service.users().threads().get(userId="me", id=id, format="full").execute()

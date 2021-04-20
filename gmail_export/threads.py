@@ -8,14 +8,14 @@ from .utils import get_datetime, clean
 
 class GmailThread(object):
     def __init__(self, id, export_root=EXPORT_PATH):
-        self.service = GmailAPI().service
+        self.api = GmailAPI()
         self.id = id
         self.export_root=export_root
         self.name = None
     
     def get_name(self):
         messages = []
-        response = self.service.users().threads().get(userId="me", id=self.id, format="full").execute()
+        response = self.api.get_thread(self.id)
         if 'messages' in response:
             msg0 = response['messages'][0]
             headers = msg0["payload"]["headers"]

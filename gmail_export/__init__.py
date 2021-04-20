@@ -36,10 +36,6 @@ if AIRTABLE:
     AIRTABLE_CFG = os.path.join(CFG_PATH, 'airtable.json')
     with open(AIRTABLE_CFG, "r") as jsonfile:
         AT_CONFIG = json.load(jsonfile)
-    atThreads = airtable.Airtable(AT_CONFIG['base_id'], 'Threads', api_key=AT_CONFIG['api_key'])
-    atLabels = airtable.Airtable(AT_CONFIG['base_id'], 'Labels', api_key=AT_CONFIG['api_key'])
-    atMessages = airtable.Airtable(AT_CONFIG['base_id'], 'Messages', api_key=AT_CONFIG['api_key'])
-    atEmails = airtable.Airtable(AT_CONFIG['base_id'], 'Emails', api_key=AT_CONFIG['api_key'])
 
 if DROPBOX:
     DROPBOX_CFG  = os.path.join(CFG_PATH, 'dropbox.json')
