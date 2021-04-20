@@ -1,0 +1,8 @@
+__version__ = "0.1.0"
+__name__ = "python-gmail-export"
+__description__ = "Python Gmail Export"
+__url__ = "https://github.com/rjmoggach/python-gmail-export"
+__author__ = "RJ Moggach"
+__authoremail__ = "rjmoggach@gmail.com"
+__license__ = "The MIT License (MIT)"
+__copyright__ = "Copyright 2021 RJ Moggach"
