@@ -1,6 +1,6 @@
 # Python GMail Export CLI
 
-This is my python tool to export mail from gmail in formats I require.
+This is my python library/tool to export mail from gmail in formats I require.
 
 This library allows me to connect to my Gmail account and download as `.eml` files for a specific label. It then converts the `.eml` files to pdf or html and extracts attachments.
 
@@ -27,12 +27,14 @@ poetry shell
 
 #### Additional Dependencies
 
-You'll also need [wkhtmltopdf](http://wkhtmltopdf.org/).
+You'll also need [wkhtmltopdf](http://wkhtmltopdf.org/) on your `PATH`.
 
-I installed using Chocolatey for Windows.
+I installed using Chocolatey for Windows and HomeBrew for Mac OS.
 
 
 ### Credentials
+
+Nothing will work without credentials...
 
 1. Go to [https://console.cloud.google.com/home/dashboard](https://console.cloud.google.com/home/dashboard)
 2. Create a new project eg. `mydomain-com-gmail`
@@ -51,10 +53,10 @@ I installed using Chocolatey for Windows.
 ### Run the Script!
 
 ```
-python gmail_export.py
+python example.py
 ```
 
-The rest is self-explanatory.
+The rest should be self-explanatory. It prompts you and does all the work you don't want to.
 
 
 ## Thank you & Credit where Credit is due
