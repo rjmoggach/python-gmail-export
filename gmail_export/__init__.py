@@ -34,9 +34,11 @@ if AIRTABLE:
     AIRTABLE_CFG = os.path.join(CFG_PATH, 'airtable.json')
     with open(AIRTABLE_CFG, "r") as jsonfile:
         AT_CONFIG = json.load(jsonfile)
-
+DB_CONFIG = {}
 if DROPBOX:
     DROPBOX_CFG  = os.path.join(CFG_PATH, 'dropbox.json')
+    with open(DROPBOX_CFG, "r") as jsonfile:
+        DB_CONFIG = json.load(jsonfile)
 
 WKHTMLTOPDF_EXTERNAL_COMMAND = 'wkhtmltopdf'
 WKHTMLTOPDF_ERRORS_IGNORE = frozenset(

@@ -10,12 +10,12 @@ class GmailThread(object):
         self.api = api.GmailAPI()
         self.id = id
     
-    def __str__(self):
-        return getattr(self, '_name', self.id)
-
     def __repr__(self):
         if not getattr(self, '_name', None) is None:
-            return f"GmailThread(id='{self.id}', name='{self.name}')"
+            if not getattr(self,'atId',None):
+                return f"GmailThread(id='{self.id}', name='{self.name}')"
+            else:
+                return f"GmailThread(id='{self.id}', name='{self.name}', atId={self.atId})"
         else:
             return f"GmailThread(id='{self.id}')"
 
@@ -33,11 +33,13 @@ class GmailThread(object):
             msg0 = response['messages'][0]
             headers = msg0["payload"]["headers"]
             internalDate = msg0["internalDate"]
-            thread_dt = export.get_datetime(internalDate).format('YYYY-MM-DD_THHmmss')
+            self.dt = export.get_datetime(internalDate)
+            thread_dt = self.dt.format('YYYY-MM-DD_THHmmss')
             subject = [header['value'] for header in headers if header["name"]=="Subject"]
             if subject == []:
                 subject = ["(no subject)"]
-            thread_name = f'{thread_dt}-{clean(subject[0])}'
+            self.subject = subject[0]
+            thread_name = f'{thread_dt}-{clean(self.subject)}'
         else:
             thread_name = thread_id
         self._name = thread_name

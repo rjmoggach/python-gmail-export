@@ -51,14 +51,14 @@ class GmailMessage(object):
         return getattr(self, '_subject', None)
 
     def populate(self, export):
-        if not self.msg:
-            self.get_mime_msg()
-        if not self.subject:
-            internalDate, subject = self.get_name_parts()
-            self._msg_dt = export.get_datetime(internalDate).format('YYYY-MM-DD-THHmmss')
-            self._subject = subject
-        self.name = f'{self.msg_dt}-{self.subject[:128]}'
-        print(f"        Message {self.id}: \"{self.name_fmt}\"")
+        self.get_mime_msg()
+        internalDate, subject = self.get_name_parts(export)
+        self.dt = export.get_datetime(internalDate)
+        self._msg_dt = export.get_datetime(internalDate).format('YYYY-MM-DD-THHmmss')
+        self._subject = subject
+        self.name = f'{self.msg_dt}-{clean(self.subject)[:128]}'
+        self.headers = self.get_headers()
+        print(f"        Message {self.id}: {self.name}")
             # {'name': "eml", 'checked': True },
             # {'name': "html" },
             # {'name': "pdf" },
@@ -67,13 +67,13 @@ class GmailMessage(object):
 
     def export(self, export):
         if 'eml' in export.config['formats']:
-            eml_name = f'{self.msg_dt}-Eml-{self.subject[:128]}.eml'
+            eml_name = f'{self.msg_dt}-Eml-{clean(self.subject)[:128]}.eml'
             self.export_eml(export.path, eml_name)
         if 'html' in export.config['formats']:
-            html_name = f'{self.msg_dt}-Eml-{self.subject[:128]}.html'
+            html_name = f'{self.msg_dt}-Eml-{clean(self.subject)[:128]}.html'
             self.export_html(export.path, html_name)
         if 'pdf' in export.config['formats']:
-            pdf_name = f'{self.msg_dt}-Eml-{self.subject[:128]}.pdf'
+            pdf_name = f'{self.msg_dt}-Eml-{clean(self.subject)[:128]}.pdf'
             self.export_pdf(export.path, pdf_name)
         if 'attachments' in export.config['formats']:
             att_name = f'{self.msg_dt}-EmlAtt'
@@ -91,7 +91,7 @@ class GmailMessage(object):
         self._msg = mime_msg
         return mime_msg
 
-    def get_name_parts(self):
+    def get_name_parts(self, export):
         print(f"        Fetching metadata", end="\r")
         # get message metadata (specifically Subject)
         self.meta = self.api.get_message_meta(self.id)
@@ -100,7 +100,7 @@ class GmailMessage(object):
         if subject == []:
             subject = ['NO SUBJECT']
         internalDate = self.meta['internalDate']
-        subject = clean(subject[0])
+        subject = subject[0]
         return internalDate, subject
 
     def get_message_body(self):
@@ -182,14 +182,14 @@ class GmailMessage(object):
                 name = header['name']
                 value = header['value']
                 if header['name'] == k:
-                    if name in ['Date','Subject', 'From']:
-                        output[k] = html_escape(value)
-                    elif name in ['To','Cc']:
+                    if name in ['Date','Subject']:
+                        output[k] = value
+                    elif name in ['From','To','Cc']:
                         if ',' in value:
                             value = value.split(',')
-                            value = [html_escape(email.strip()) for email in value]
+                            value = [email.strip() for email in value]
                         else:
-                            value = [html_escape(value)]
+                            value = [value]
                         output[k] = value
         return output
 

@@ -19,7 +19,10 @@ class GmailLabel(object):
         return self.name
 
     def __repr__(self):
-        return f"GmailLabel(id='{self.id}', name='{self.name}', selected={self.selected})"
+        if not getattr(self,'atId',None):
+            return f"GmailLabel(id='{self.id}', name='{self.name}', selected={self.selected})"
+        else:
+            return f"GmailLabel(id='{self.id}', name='{self.name}', atId={self.atId}, selected={self.selected})"
 
     def populate(self, export):
         print(f"\n> Label {self.id}: \"{self.name}\"")

@@ -103,11 +103,11 @@
 <body>
     <div id="meta">
     <dl class="email-meta">
-        <dt>From:</dt> <dd class="strong">{{ headers["From"] }}</dd>
+        <dt>From:</dt> <dd class="strong">{% for hfrom in headers["From"] %}{% filter escape %}{{ hfrom }}{% endfilter %}{% endfor %}</dd>
         <dt>Subject:</dt> <dd>{{ headers["Subject"] }}</dd>
         <dt>Date:</dt> <dd>{{ headers["Date"] }}</dd>
-        <dt>To:</dt> <dd>{% for hto in headers["To"] %}{{ hto }}{{ ", " if not loop.last else "" }}{% endfor %}</dd>{% if headers["Cc"] %}
-        <dt>Cc:</dt> <dd>{% for hcc in headers["Cc"] %}{{ hcc }}{{ ", " if not loop.last else "" }}{% endfor %}</dd>{% endif %}
+        <dt>To:</dt> <dd>{% for hto in headers["To"] %}{% filter escape %}{{ hto }}{% endfilter %}{{ ", " if not loop.last else "" }}{% endfor %}</dd>{% if headers["Cc"] %}
+        <dt>Cc:</dt> <dd>{% for hcc in headers["Cc"] %}{% filter escape %}{{ hcc }}{% endfilter %}{{ ", " if not loop.last else "" }}{% endfor %}</dd>{% endif %}
     </dl>
     </div>
     {{ body }}{% if attachments %}
