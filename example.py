@@ -1,11 +1,10 @@
-
 from gmail_export.cli import ExportCLI
 
 
-
 def main():
-    gmail_export=ExportCLI()
-    gmail_export.export()
+    exporter=ExportCLI()
+    print(exporter)
+    exporter.export_selected_labels()
 
 if __name__ == '__main__':
     main()
