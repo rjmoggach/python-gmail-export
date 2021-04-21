@@ -13,9 +13,9 @@ from jinja2 import Environment, PackageLoader, select_autoescape
 from bs4 import BeautifulSoup, NavigableString, Tag
 from rfc6266_parser import parse_headers, build_header
 
-from . import EXPORT_PATH, WKHTMLTOPDF_EXTERNAL_COMMAND, WKHTMLTOPDF_ERRORS_IGNORE, IMAGE_LOAD_BLACKLIST, FatalException
-from .api import GmailAPI
-from .utils import get_datetime, clean, html_escape, can_url_fetch
+from gmail_export import WKHTMLTOPDF_EXTERNAL_COMMAND, WKHTMLTOPDF_ERRORS_IGNORE, IMAGE_LOAD_BLACKLIST, FatalException
+from gmail_export.utils import clean, html_escape, can_url_fetch
+import gmail_export.api as api
 
 env = Environment(
     loader=PackageLoader('gmail_export','templates'),
@@ -23,23 +23,85 @@ env = Environment(
 )
 
 class GmailMessage(object):
-    def __init__(self, id, thread, msg=None):
-        self.api = GmailAPI()
+    def __init__(self, id, thread, label):
+        self.api = api.GmailAPI()
         self.id = id
-        self.msg = msg
-        # self.msg_dt, self.subject = self.get_name_parts()
-        self.threadId = thread.id
+        self.labels = [label]
         self.thread = thread
+        self.threadId = thread.id
 
-    def get_message(self):
+        # self.msg_dt, self.subject = self.get_name_parts()
+
+    def __str__(self):
+        return self.id
+
+    def __repr__(self):
+        return f"GmailMessage(id='{self.id}')"
+
+    @property
+    def msg(self):
+        return getattr(self, '_msg', None)
+
+    @property
+    def msg_dt(self):
+        return getattr(self, '_msg_dt', None)
+
+    @property
+    def subject(self):
+        return getattr(self, '_subject', None)
+
+    def populate(self, export):
+        if not self.msg:
+            self.get_mime_msg()
+        if not self.subject:
+            internalDate, subject = self.get_name_parts()
+            self._msg_dt = export.get_datetime(internalDate).format('YYYY-MM-DD-THHmmss')
+            self._subject = subject
+        self.name = f'{self.msg_dt}-{self.subject[:128]}'
+        print(f"        Message {self.id}: \"{self.name_fmt}\"")
+            # {'name': "eml", 'checked': True },
+            # {'name': "html" },
+            # {'name': "pdf" },
+            # {'name': "attachments"},
+            # {'name': "inline"}
+
+    def export(self, export):
+        if 'eml' in export.config['formats']:
+            eml_name = f'{self.msg_dt}-Eml-{self.subject[:128]}.eml'
+            self.export_eml(export.path, eml_name)
+        if 'html' in export.config['formats']:
+            html_name = f'{self.msg_dt}-Eml-{self.subject[:128]}.html'
+            self.export_html(export.path, html_name)
+        if 'pdf' in export.config['formats']:
+            pdf_name = f'{self.msg_dt}-Eml-{self.subject[:128]}.pdf'
+            self.export_pdf(export.path, pdf_name)
+        if 'attachments' in export.config['formats']:
+            att_name = f'{self.msg_dt}-EmlAtt'
+            self.export_content(export.path, att_name, False)
+        if 'inline' in export.config['formats']:
+            inl_name = f'{self.msg_dt}-Inline'
+            self.export_content(export.path, inl_name, True)
+
+    def get_mime_msg(self):
+        print(f"        Fetching mime msg", end="\r")
         # get entire message in RFC2822 formatted base64url encoded string to convert to .eml
         msg_raw = self.api.get_message_id(self.id)
         msg_bytes = base64.urlsafe_b64decode(msg_raw['raw'])
         mime_msg = email.message_from_bytes(msg_bytes)
-        # msg_str = base64.urlsafe_b64decode(msg_raw['raw'].encode('UTF-8'))
-        # mime_msg = email.message_from_string(msg_str.decode())
-        self.msg = mime_msg
+        self._msg = mime_msg
         return mime_msg
+
+    def get_name_parts(self):
+        print(f"        Fetching metadata", end="\r")
+        # get message metadata (specifically Subject)
+        self.meta = self.api.get_message_meta(self.id)
+        headers = self.meta['payload']['headers']
+        subject = [header['value'] for header in headers if header['name']=="Subject"]
+        if subject == []:
+            subject = ['NO SUBJECT']
+        internalDate = self.meta['internalDate']
+        subject = clean(subject[0])
+        return internalDate, subject
 
     def get_message_body(self):
         part = self.get_part_by_content_type("text/html")
@@ -50,18 +112,6 @@ class GmailMessage(object):
             return self.handle_plain_message_body(part)
         raise FatalException("Email message has no body")
 
-    def get_name_parts(self):
-        # get message metadata (specifically Subject)
-        self.meta = self.api.get_message_meta(self.id)
-        headers = self.meta['payload']['headers']
-        subject = [header['value'] for header in headers if header['name']=="Subject"]
-        if subject == []:
-            subject = ['NO SUBJECT']
-        internalDate = self.meta['internalDate']
-        msg_dt = get_datetime(internalDate).format('YYYY-MM-DD-THHmmss')
-        subject = clean(subject[0])
-        return msg_dt, subject
-
     def convert(self):
         try:
             body = self.get_message_body()
@@ -69,17 +119,11 @@ class GmailMessage(object):
             body = ""
         body = self.clean_soup(body)
         headers = self.get_headers()
-
-        # self.msg_dt, self.subject = self.get_name_parts()
         self.attachments = self.find_attachments()
         content_disposition_list = [parse_headers(att[0]) for att in self.attachments]
-        # attachment_meta = [att[0] for att in self.attachments]
-        # print("ATTACH META:", attachment_meta)
         att_list = []
         for cd in content_disposition_list:
             att_list.append({'filename': cd.filename_unsafe})
-        # for m in attachment_meta:
-        #     m.update((k, f'{self.msg_dt}-EmlAtt-{m["filename"]}') for k, v in m.items() if k == "filename")
         template = env.get_template('email.html')
         rendered = template.render(headers=headers, body=body, attachments=att_list)
         return rendered
@@ -122,7 +166,6 @@ class GmailMessage(object):
             if font.has_attr('style'):
                 style = font['style']
                 if style == "background-color:rgb(255,255,255)": del font['style']
-        # return str(soup.encode('utf-8').decode('utf-8'))
         return str(soup.prettify('utf-8').decode('utf-8'))
 
     def get_headers(self):
@@ -237,36 +280,13 @@ class GmailMessage(object):
         #         "Could not find image cid " + cid + " in email content.")
         return ""
 
-    def export(self, eml=True, html5=False, pdf=False, att=False, inl=False):
-        thread_path = self.thread.get_export_path(self.thread.export_root)
-        if not os.path.isdir(thread_path):
-            os.makedirs(thread_path, exist_ok=True)
-        print(f"> Saving to thread: {thread_path}")
-        self.msg_dt, self.subject = self.get_name_parts()
-        self.msg = self.get_message()
-        if eml:
-            eml_name = f'{self.msg_dt}-Eml-{self.subject[:128]}.eml'
-            self.export_eml(thread_path, eml_name)
-        if html5:
-            html_name = f'{self.msg_dt}-Eml-{self.subject[:128]}.html'
-            self.export_html(thread_path, html_name)
-        if pdf:
-            pdf_name = f'{self.msg_dt}-Eml-{self.subject[:128]}.pdf'
-            self.export_pdf(thread_path, pdf_name)
-        if att:
-            att_name = f'{self.msg_dt}-EmlAtt'
-            self.export_content(thread_path, att_name, False)
-        if inl:
-            inl_name = f'{self.msg_dt}-Inline'
-            self.export_content(thread_path, inl_name, True)
-
     def export_eml(self, export_path, eml_name):
         write_path = os.path.join(export_path, eml_name)
         try:
             with open(write_path, 'w') as outfile:
                 gen = email.generator.Generator(outfile)
                 gen.flatten(self.msg)
-            print(f"  > Saved msg id: {self.id} to eml: {eml_name}.")
+            print(f"        > Saved eml:  {eml_name}")
             return write_path
         except:
             return None
@@ -276,7 +296,7 @@ class GmailMessage(object):
         write_path = os.path.join(export_path, html_name)
         with open(write_path, 'wb') as outfile:
             outfile.write(output)
-            print(f"  > Saved msg id: {self.id} to html: {html_name}.")
+            print(f"        > Saved html: {html_name}")
         return write_path
 
     def export_pdf(self, export_path, pdf_name):
@@ -292,7 +312,7 @@ class GmailMessage(object):
         ret_code = wkh2p_process.returncode
         assert output == b''
         self.process_errors(ret_code, error)
-        print(f"  > Saved msg id: {self.id} to pdf: {pdf_name}")
+        print(f"        > Saved pdf:  {pdf_name}")
         return write_path
 
     def process_errors(self, ret_code, error):
@@ -327,9 +347,8 @@ class GmailMessage(object):
                 data = part.get_payload(decode=True)
                 outfile.write(data)
             str_inline="inline " if inline else ""
-            print(f"    > Saved {str_inline}content: {content_name}.")
+            print(f"          > Saved {str_inline}content: {content_name}")
         return True
-
 
     def find_attachments(self, inline=False):
         """
@@ -360,32 +379,5 @@ class GmailMessage(object):
                 if disposition == 'inline':
                     try: parsed = build_header(content_disposition.filename_unsafe)
                     except TypeError: continue
-                    attachments.append((parsed, part))
-        return attachments
-
-    def find_attachmentsOld(self, inline=False):
-        """
-        Return a tuple of parsed content-disposition dict, message object for each attachment found
-        """
-        attachments = []
-        for part in self.msg.walk():
-            if 'content-disposition' not in part:
-                continue
-            content_disposition = part['content-disposition'].split(';')
-            content_disposition = [i.strip() for i in content_disposition]
-            content = content_disposition[0].lower()
-            if not content in ['attachment', 'inline']:
-                continue
-            parsed = {}
-            for kv in content_disposition[1:]:
-                key, _, val = kv.partition('=')
-                if val.startswith('"'): val = val.strip('"')
-                elif val.startswith("'"): val = val.strip("'")
-                parsed[key] = val
-            if not inline:
-                if content == 'attachment':
-                    attachments.append((parsed, part))
-            elif inline:
-                if content == 'inline':
                     attachments.append((parsed, part))
         return attachments
