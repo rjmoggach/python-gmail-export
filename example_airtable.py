@@ -5,9 +5,12 @@ from gmail_export.api import AirtableAPI
 def main():
     exporter=ExportCLI()
     exporter.export_selected_labels()
+    # print(f"MESSAGES: {exporter.messages}")
     # for k,v in exporter.messages.items():
     #     print("LABELS: ", v.labels)
-    print(f"\nSCRIPT EXPORTER THREADS: {exporter.threads}\n")
+    # print(f"\nSCRIPT EXPORTER THREADS: {exporter.threads}\n")
+
+
     airtable=AirtableAPI(exporter)
     airtable.labels=exporter.selected_labels
     airtable.threads=exporter.threads

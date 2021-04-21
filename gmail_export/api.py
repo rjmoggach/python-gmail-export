@@ -167,28 +167,6 @@ class AirtableAPI(object):
     def labels(self):
         return self._labels
 
-    # @labels.setter
-    # def labels(self, export_labels):
-    #     atLabels = self.labels_query.get_all(fields=['labelId'])
-    #     atLabelIds = {}
-    #     for label in atLabels:
-    #         labelId = label['fields']['labelId']
-    #         id = label['id']
-    #         atLabelIds[labelId]=id
-    #     old_labels=[]
-    #     new_labels=[]
-    #     for label in export_labels:
-    #         if label.id in atLabelIds:
-    #             old_labels.append(label)
-    #         else:
-    #             new_labels.append(label)
-    #     for label in old_labels:
-    #         label.atId = atLabelIds[label.id]
-    #     for label in new_labels:
-    #         check_limit()
-    #         label.atId = self.labels_query.insert({'labelId': label.id, 'Name': label.name})
-    #     self._labels = export_labels
-
     @labels.setter
     def labels(self, new_labels):
         _labels = getattr(self,'_labels',{})
@@ -247,11 +225,10 @@ class AirtableAPI(object):
         _messages = getattr(self,'_messages',{})
         atMessages = self.messages_query.get_all(fields=['messageId', 'Labels'])
         atMessageIds = {message['fields']['messageId']:message['id'] for message in atMessages }
-
+        atLabels = { message['fields']['messageId']:message['fields'].get('Labels',[]) for message in atMessages }
         for message_id, new_message in new_messages.items():
-
-            new_message.populate(self.export)
             email_headers={}
+            new_labels = [label.atId for label in new_message.labels]
             for email_type in ['From','To', 'Cc']:
                 email_headers[email_type]=[]
                 input = []
@@ -270,6 +247,13 @@ class AirtableAPI(object):
             if message_id in atMessageIds:
                 if not getattr(new_message,'atId',None):
                     new_message.atId = atMessageIds[message_id]
+                if new_labels:
+                    atLabelsForMessage = atLabels.get(message_id, [])
+                    # labels = list(set(new_labels) - set(atLabelsForMessage))
+                    resulting_list = list(atLabelsForMessage)
+                    resulting_list.extend(x for x in new_labels if x not in resulting_list)
+                    self.messages_query.update(new_message.atId, {'Labels': resulting_list})
+                    # insert new list value
             else:
                 data = {
                     'messageId': message_id,
@@ -280,12 +264,13 @@ class AirtableAPI(object):
                     'From': email_headers['From'],
                     'To': email_headers['To'],
                     'Cc': email_headers['Cc'],
-                    'Labels': [label.atId for label in new_message.labels]
+                    'Labels': new_labels
                 }
-                print(f"NEW MSG LABELS: {new_message.labels}")
-                print(f"DATA: {data}")
+                # print(f"NEW MSG LABELS: {new_message.labels}")
+                # print(f"DATA: {data}")
                 atId = self.messages_query.insert(data)
                 new_message.atId = atId['id']
+            
             # labels = {label.atId:label for label in new_message.labels}
             # if new_message.labels
 

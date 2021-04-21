@@ -24,46 +24,40 @@ class GmailLabel(object):
         else:
             return f"GmailLabel(id='{self.id}', name='{self.name}', atId={self.atId}, selected={self.selected})"
 
-    def populate(self, export):
+    def populate(self, exporter):
         print(f"\n> Label {self.id}: \"{self.name}\"")
         # labels don't have export path by default because we get that interactively
         # init the label path with the value of self.export_root retrieved from the CLI
-        self.export_path = os.path.join(export.export_path, self.name)
+        self.export_path = os.path.join(exporter.export_path, self.name)
         # get the label messages for me
         self.messageIds = self
         for idx, messageId in enumerate(self.messageIds):
             threadId = self.threadIds[idx]
-            if not threadId in export.threads:
+            if not threadId in exporter.threads:
                 thread = GmailThread(threadId)
-                export.threads[threadId] = thread
+                exporter.threads[threadId] = thread
             else:
-                thread = export.threads[threadId]
-            if not messageId in export.messages:
-                export.messages[messageId] = GmailMessage(messageId, thread, self)
+                thread = exporter.threads[threadId]
+            if not messageId in exporter.messages:
+                exporter.messages[messageId] = GmailMessage(messageId, thread, self, exporter)
+                exporter.messages[messageId].meta = messageId
             else:
-                export.messages[messageId].labels.append(self)
-        # export.messages.extend(self.messages)
-        # message_count = len(self.messages)
-        # i=1
-        # for message in self.messages:
-        #     print(f"\n> Message {i} of {message_count} for label '{self.name}'.")
-        #     i+=1
-        #     message.export(config)
+                exporter.messages[messageId].labels.append(self)
 
-    def export(self, export):
+    def export(self, exporter):
         thread = None
         os.makedirs(self.export_path,exist_ok=True)
-        print(f"  > Path: {export.path}")
+        print(f"  > Path: {exporter.path}")
         for idx, messageId in enumerate(self.messageIds):
-            message = export.messages[messageId]
-            if not message.thread is thread:
-                message.thread.populate(export)
-                export.path = os.path.join(self.export_path, message.thread.name)
-                os.makedirs(export.path,exist_ok=True)
-                print(f"      > Path: {export.path}")
-                message.populate(export)
-                message.export(export)
-            thread = getattr(message, "thread", export.threads[self.threadIds[idx]])
+            # message = exporter.messages[messageId]
+            if not exporter.messages[messageId].thread is thread:
+                exporter.messages[messageId].thread.populate(exporter)
+                exporter.path = os.path.join(self.export_path, exporter.messages[messageId].thread.name)
+                os.makedirs(exporter.path,exist_ok=True)
+                print(f"      > Path: {exporter.path}")
+                exporter.messages[messageId].populate(exporter)
+                exporter.messages[messageId].export(exporter)
+            thread = getattr(exporter.messages[messageId], "thread", exporter.threads[self.threadIds[idx]])
 
     @property
     def messageIds(self):

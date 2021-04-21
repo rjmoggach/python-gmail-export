@@ -23,12 +23,13 @@ env = Environment(
 )
 
 class GmailMessage(object):
-    def __init__(self, id, thread, label):
+    def __init__(self, id, thread, label, exporter=None):
         self.api = api.GmailAPI()
         self.id = id
         self.labels = [label]
         self.thread = thread
         self.threadId = thread.id
+        self.exporter = exporter
 
         # self.msg_dt, self.subject = self.get_name_parts()
 
@@ -36,7 +37,37 @@ class GmailMessage(object):
         return self.id
 
     def __repr__(self):
-        return f"GmailMessage(id='{self.id}')"
+        if getattr(self, 'headers', None) is None:
+            if not getattr(self,'atId',None):
+                return f"GmailMessage(id='{self.id}', headers=<multiple>)"
+            else:
+                return f"GmailMessage(id='{self.id}', headers=<multiple>, atId={self.atId})"
+        else:
+            if not getattr(self,'atId',None):
+                return f"GmailMessage(id='{self.id}')"
+            else:
+                return f"GmailMessage(id='{self.id}', atId={self.atId})"
+
+    @property
+    def meta(self):
+        return getattr(self,'_meta',{})
+
+    @meta.setter
+    def meta(self, id):
+        _meta = {}
+        response = self.api.get_message_meta(id)
+        headers = response['payload']['headers']
+        subject = [header['value'] for header in headers if header['name']=="Subject"]
+        if subject == []:
+            subject = ['NO SUBJECT']
+        internalDate = response['internalDate']
+        subject = subject[0]
+        _meta = {
+            'headers': headers,
+            'subject': subject,
+            'internalDate': internalDate
+        }
+        self._meta = _meta
 
     @property
     def msg(self):
@@ -44,43 +75,74 @@ class GmailMessage(object):
 
     @property
     def msg_dt(self):
-        return getattr(self, '_msg_dt', None)
+        return self.exporter.get_datetime(self.internalDate).format('YYYY-MM-DD-THHmmss')
+
+    @property
+    def dt(self):
+        return self.exporter.get_datetime(self.internalDate)
 
     @property
     def subject(self):
         return getattr(self, '_subject', None)
 
-    def populate(self, export):
-        self.get_mime_msg()
-        internalDate, subject = self.get_name_parts(export)
-        self.dt = export.get_datetime(internalDate)
-        self._msg_dt = export.get_datetime(internalDate).format('YYYY-MM-DD-THHmmss')
-        self._subject = subject
-        self.name = f'{self.msg_dt}-{clean(self.subject)[:128]}'
-        self.headers = self.get_headers()
-        print(f"        Message {self.id}: {self.name}")
-            # {'name': "eml", 'checked': True },
-            # {'name': "html" },
-            # {'name': "pdf" },
-            # {'name': "attachments"},
-            # {'name': "inline"}
+    @property
+    def name(self):
+        return f'{self.msg_dt}-{clean(self.subject)[:128]}'
 
-    def export(self, export):
-        if 'eml' in export.config['formats']:
+    @property
+    def internalDate(self):
+        return self.meta['internalDate']
+
+    @property
+    def subject(self):
+        return self.meta['subject']
+
+    @property
+    def headers(self):
+        _headers=self.meta['headers']
+        output = {
+            'Subject': None,
+            'From': None,
+            'To': [],
+            'Date': None,
+            'Cc': []
+        }
+        for k,v in output.items():
+            for header in _headers:
+                name = header['name']
+                value = header['value']
+                if header['name'] == k:
+                    if name in ['Date','Subject']:
+                        output[k] = value
+                    elif name in ['From','To','Cc']:
+                        if ',' in value:
+                            value = value.split(',')
+                            value = [email.strip() for email in value]
+                        else:
+                            value = [value]
+                        output[k] = value
+        return output
+
+    def populate(self, exporter):
+        self.get_mime_msg()
+        print(f"        Message {self.id}: {self.name}")
+
+    def export(self, exporter):
+        if 'eml' in exporter.config['formats']:
             eml_name = f'{self.msg_dt}-Eml-{clean(self.subject)[:128]}.eml'
-            self.export_eml(export.path, eml_name)
-        if 'html' in export.config['formats']:
+            self.export_eml(exporter.path, eml_name)
+        if 'html' in exporter.config['formats']:
             html_name = f'{self.msg_dt}-Eml-{clean(self.subject)[:128]}.html'
-            self.export_html(export.path, html_name)
-        if 'pdf' in export.config['formats']:
+            self.export_html(exporter.path, html_name)
+        if 'pdf' in exporter.config['formats']:
             pdf_name = f'{self.msg_dt}-Eml-{clean(self.subject)[:128]}.pdf'
-            self.export_pdf(export.path, pdf_name)
-        if 'attachments' in export.config['formats']:
+            self.export_pdf(exporter.path, pdf_name)
+        if 'attachments' in exporter.config['formats']:
             att_name = f'{self.msg_dt}-EmlAtt'
-            self.export_content(export.path, att_name, False)
-        if 'inline' in export.config['formats']:
+            self.export_content(exporter.path, att_name, False)
+        if 'inline' in exporter.config['formats']:
             inl_name = f'{self.msg_dt}-Inline'
-            self.export_content(export.path, inl_name, True)
+            self.export_content(exporter.path, inl_name, True)
 
     def get_mime_msg(self):
         print(f"        Fetching mime msg", end="\r")
@@ -90,18 +152,6 @@ class GmailMessage(object):
         mime_msg = email.message_from_bytes(msg_bytes)
         self._msg = mime_msg
         return mime_msg
-
-    def get_name_parts(self, export):
-        print(f"        Fetching metadata", end="\r")
-        # get message metadata (specifically Subject)
-        self.meta = self.api.get_message_meta(self.id)
-        headers = self.meta['payload']['headers']
-        subject = [header['value'] for header in headers if header['name']=="Subject"]
-        if subject == []:
-            subject = ['NO SUBJECT']
-        internalDate = self.meta['internalDate']
-        subject = subject[0]
-        return internalDate, subject
 
     def get_message_body(self):
         part = self.get_part_by_content_type("text/html")
@@ -113,19 +163,19 @@ class GmailMessage(object):
         raise FatalException("Email message has no body")
 
     def convert(self):
+        self.meta = self.id
         try:
             body = self.get_message_body()
         except:
             body = ""
         body = self.clean_soup(body)
-        headers = self.get_headers()
         self.attachments = self.find_attachments()
         content_disposition_list = [parse_headers(att[0]) for att in self.attachments]
         att_list = []
         for cd in content_disposition_list:
             att_list.append({'filename': cd.filename_unsafe})
         template = env.get_template('email.html')
-        rendered = template.render(headers=headers, body=body, attachments=att_list)
+        rendered = template.render(headers=self.headers, body=body, attachments=att_list)
         return rendered
 
     def clean_soup(self, payload):
@@ -168,30 +218,6 @@ class GmailMessage(object):
                 if style == "background-color:rgb(255,255,255)": del font['style']
         return str(soup.prettify('utf-8').decode('utf-8'))
 
-    def get_headers(self):
-        payload_headers=self.meta['payload']['headers']
-        output = {
-            'Subject': None,
-            'From': None,
-            'To': [],
-            'Date': None,
-            'Cc': []
-        }
-        for k,v in output.items():
-            for header in payload_headers:
-                name = header['name']
-                value = header['value']
-                if header['name'] == k:
-                    if name in ['Date','Subject']:
-                        output[k] = value
-                    elif name in ['From','To','Cc']:
-                        if ',' in value:
-                            value = value.split(',')
-                            value = [email.strip() for email in value]
-                        else:
-                            value = [value]
-                        output[k] = value
-        return output
 
     def get_part_by_content_type(self, content_type):
         for part in self.msg.walk():
