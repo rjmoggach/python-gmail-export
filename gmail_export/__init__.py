@@ -5,15 +5,21 @@
 """
 import os
 import json
+from os.path import expanduser
 from pathlib import Path
+import platform
+
+
 try:
     import airtable
     AIRTABLE = True
-except ImportError: AIRTABLE = False
+except ImportError: 
+    AIRTABLE = False
 try:
     import dropbox
     DROPBOX = True
-except ImportError: DROPBOX = False
+except ImportError: 
+    DROPBOX = False
 
 TIMEZONE='America/Toronto'
 
@@ -25,8 +31,7 @@ SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 IMAGE_LOAD_BLACKLIST = frozenset(['emltrk.com', 'trk.email', 'shim.gif'])
 
 
-EXPORT_PATH = os.path.join(CFG_PATH, 'export')
-os.makedirs(EXPORT_PATH, exist_ok=True)
+
 
 
 AT_CONFIG = {}
@@ -39,6 +44,34 @@ if DROPBOX:
     DROPBOX_CFG  = os.path.join(CFG_PATH, 'dropbox.json')
     with open(DROPBOX_CFG, "r") as jsonfile:
         DB_CONFIG = json.load(jsonfile)
+
+if platform.system() == "Windows":
+    appdata=os.path.join(os.getenv('APPDATA'),'Dropbox','info.json' )
+    localappdata=os.path.join(os.getenv('LOCALAPPDATA'),'Dropbox','info.json' )
+    if os.path.isfile(appdata):
+        with open(appdata, "r") as jsonfile:
+            _path = json.load(jsonfile)['personal']['path']
+            EXPORT_PATH = os.path.join(_path, "EmailBackup")
+    elif os.path.isfile(localappdata):
+        with open(localappdata, "r") as jsonfile:
+            _path = json.load(jsonfile)['personal']['path']
+            EXPORT_PATH = os.path.join(_path, "EmailBackup")
+    else:
+        EXPORT_PATH = os.path.join(CFG_PATH, 'export')
+        os.makedirs(EXPORT_PATH, exist_ok=True)
+else:
+    dbcfg=expanduser('~/.dropbox/info.json')
+    if os.path.isfile(dbcfg):
+        with open(dbcfg, "r") as jsonfile:
+            _path = json.load(jsonfile)['personal']['path']
+            EXPORT_PATH = os.path.join(_path, "EmailBackup")
+    else:
+        EXPORT_PATH = os.path.join(CFG_PATH, 'export')
+
+os.makedirs(EXPORT_PATH, exist_ok=True)
+
+print("EXPORT_PATH: ", EXPORT_PATH)
+
 
 WKHTMLTOPDF_EXTERNAL_COMMAND = 'wkhtmltopdf'
 WKHTMLTOPDF_ERRORS_IGNORE = frozenset(
